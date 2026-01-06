@@ -36,5 +36,8 @@ def apply_pipeline(schematic: Schematic, ruleset: RuleSet) -> tuple[Schematic, T
         data_version=schematic.data_version,
         version=schematic.version,
         metadata=dict(schematic.metadata),
+        container=schematic.container,
+        blocks_container=schematic.blocks_container,
+        block_data_key=schematic.block_data_key,
     )
     return output, stats

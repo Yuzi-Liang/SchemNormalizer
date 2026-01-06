@@ -12,13 +12,25 @@ from .model import Block, BlockPlacement, Schematic
 def read_schematic(path: Path) -> Schematic:
     root = nbtlib.load(str(path))
 
-    width = int(root.get("Width", 0))
-    height = int(root.get("Height", 0))
-    length = int(root.get("Length", 0))
+    container = root
+    container_kind = "root"
+    if isinstance(root.get("Schematic"), Compound):
+        container = root["Schematic"]
+        container_kind = "schematic"
+
+    blocks_container = container
+    blocks_container_kind = "root"
+    if isinstance(container.get("Blocks"), Compound):
+        blocks_container = container["Blocks"]
+        blocks_container_kind = "blocks"
+
+    width = int(container.get("Width", 0))
+    height = int(container.get("Height", 0))
+    length = int(container.get("Length", 0))
     if width <= 0 or height <= 0 or length <= 0:
         raise ValueError("Invalid schematic dimensions.")
 
-    palette = root.get("Palette")
+    palette = blocks_container.get("Palette")
     if palette is None:
         raise ValueError("Schematic is missing Palette tag.")
 
@@ -26,12 +38,16 @@ def read_schematic(path: Path) -> Schematic:
     for name, value in palette.items():
         palette_by_id[int(value)] = str(name)
 
-    raw_block_data = root.get("BlockData")
+    raw_block_data = blocks_container.get("BlockData")
+    block_data_key = "BlockData"
     if raw_block_data is None:
-        raise ValueError("Schematic is missing BlockData tag.")
+        raw_block_data = blocks_container.get("Data")
+        block_data_key = "Data"
+    if raw_block_data is None:
+        raise ValueError("Schematic is missing BlockData/Data tag.")
     block_data = _decode_varints(bytes(raw_block_data), width * height * length)
 
-    block_entities = _read_block_entities(root)
+    block_entities = _read_block_entities(blocks_container)
 
     blocks: list[BlockPlacement] = []
     size = (width, height, length)
@@ -52,13 +68,16 @@ def read_schematic(path: Path) -> Schematic:
                     )
                 )
 
-    metadata = _collect_metadata(root)
+    metadata = _collect_metadata(container)
     return Schematic(
         size=size,
         blocks=blocks,
-        data_version=_maybe_int(root.get("DataVersion")),
-        version=_maybe_int(root.get("Version")),
+        data_version=_maybe_int(container.get("DataVersion")),
+        version=_maybe_int(container.get("Version")),
         metadata=metadata,
+        container=container_kind,
+        blocks_container=blocks_container_kind,
+        block_data_key=block_data_key,
     )
 
 
@@ -84,17 +103,33 @@ def write_schematic(schematic: Schematic, path: Path) -> None:
 
     block_entities = _build_block_entities(schematic)
 
-    root = Compound(dict(schematic.metadata))
-    root["Version"] = Int(schematic.version or 2)
+    root = Compound()
+    if schematic.container == "schematic":
+        container = Compound()
+        root["Schematic"] = container
+    else:
+        container = root
+
+    if schematic.blocks_container == "blocks":
+        blocks_container = Compound()
+        container["Blocks"] = blocks_container
+    else:
+        blocks_container = container
+
+    for key, value in schematic.metadata.items():
+        container[key] = value
+
+    container["Version"] = Int(schematic.version or 2)
     if schematic.data_version is not None:
-        root["DataVersion"] = Int(schematic.data_version)
-    root["Width"] = Short(width)
-    root["Height"] = Short(height)
-    root["Length"] = Short(length)
-    root["PaletteMax"] = Int(len(palette))
-    root["Palette"] = palette_compound
-    root["BlockData"] = ByteArray(list(_encode_varints(block_data)))
-    root["BlockEntities"] = List[Compound](block_entities)
+        container["DataVersion"] = Int(schematic.data_version)
+    container["Width"] = Short(width)
+    container["Height"] = Short(height)
+    container["Length"] = Short(length)
+
+    blocks_container["PaletteMax"] = Int(len(palette))
+    blocks_container["Palette"] = palette_compound
+    blocks_container[schematic.block_data_key] = ByteArray(_to_signed_bytes(_encode_varints(block_data)))
+    blocks_container["BlockEntities"] = List[Compound](block_entities)
 
     nbtlib.File(root).save(str(path), gzipped=True)
 
@@ -144,6 +179,13 @@ def _encode_varints(values: list[int]) -> bytes:
     return bytes(out)
 
 
+def _to_signed_bytes(data: bytes) -> list[int]:
+    signed: list[int] = []
+    for byte in data:
+        signed.append(byte - 256 if byte > 127 else byte)
+    return signed
+
+
 def _read_block_entities(root: Compound) -> dict[tuple[int, int, int], Compound]:
     entities = root.get("BlockEntities") or root.get("TileEntities") or []
     mapping: dict[tuple[int, int, int], Compound] = {}
@@ -186,8 +228,10 @@ def _collect_metadata(root: Compound) -> dict:
         "PaletteMax",
         "Palette",
         "BlockData",
+        "Data",
         "BlockEntities",
         "TileEntities",
+        "Blocks",
     }
     metadata = {}
     for key, value in root.items():

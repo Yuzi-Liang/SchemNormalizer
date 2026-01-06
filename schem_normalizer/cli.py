@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from pathlib import Path
+import sys
 
 from .adapter import read_schematic, write_schematic
+from .blockstate import format_block_state
 from .pipeline import apply_pipeline
 from .rules import RuleError, load_rules
 
@@ -22,15 +25,56 @@ def _iter_input_files(input_path: Path, pattern: str) -> list[Path]:
     return [path for path in input_path.rglob(pattern) if path.is_file()]
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Normalize .schem blocks using JSON rules.")
-    parser.add_argument("input", type=Path, help="Input .schem file or directory")
-    parser.add_argument("-o", "--output", type=Path, help="Output file or directory")
-    parser.add_argument("-c", "--config", type=Path, required=True, help="Rules JSON file")
-    parser.add_argument("--glob", default="*.schem", help="Glob pattern for batch mode")
-    parser.add_argument("--dry-run", action="store_true", help="Do not write output files")
-    args = parser.parse_args()
+def _count_blocks(
+    input_path: Path,
+    pattern: str,
+    by_state: bool,
+    per_file: bool,
+    show_progress: bool,
+) -> None:
+    files = _iter_input_files(input_path, pattern)
+    if not files:
+        raise SystemExit("No .schem files matched the input.")
 
+    totals: Counter[str] = Counter()
+    total_files = len(files)
+    for index, input_file in enumerate(files, start=1):
+        try:
+            schematic = read_schematic(input_file)
+        except Exception as exc:
+            if show_progress:
+                _print_progress(f"[{index}/{total_files}] {input_file} | error")
+            print(f"skip {input_file}: {exc}", file=sys.stderr)
+            continue
+        counter: Counter[str] = Counter()
+        block_count = len(schematic.blocks)
+        for i, placement in enumerate(schematic.blocks, start=1):
+            if by_state:
+                key = format_block_state(placement.block.id, placement.block.states)
+            else:
+                key = placement.block.id
+            counter[key] += 1
+            if show_progress and block_count >= 50000 and i % 10000 == 0:
+                _print_progress(
+                    f"[{index}/{total_files}] {input_file} | blocks {i}/{block_count}"
+                )
+        if per_file:
+            print(f"[{input_file}]")
+            for key in sorted(counter):
+                print(f"{key}:{counter[key]}")
+        totals.update(counter)
+        if show_progress:
+            _print_progress(f"[{index}/{total_files}] {input_file} | done")
+
+    if not per_file:
+        for key in sorted(totals):
+            print(f"{key}:{totals[key]}")
+    if show_progress:
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+
+
+def _normalize(args: argparse.Namespace) -> None:
     try:
         ruleset = load_rules(args.config)
     except RuleError as exc:
@@ -56,8 +100,12 @@ def main() -> None:
             output_file = output_dir / relative
             output_file.parent.mkdir(parents=True, exist_ok=True)
 
-        schematic = read_schematic(input_file)
-        normalized, stats = apply_pipeline(schematic, ruleset)
+        try:
+            schematic = read_schematic(input_file)
+            normalized, stats = apply_pipeline(schematic, ruleset)
+        except Exception as exc:
+            print(f"skip {input_file}: {exc}", file=sys.stderr)
+            continue
 
         print(
             f"{input_file} -> {output_file} | "
@@ -66,6 +114,64 @@ def main() -> None:
 
         if not args.dry_run:
             write_schematic(normalized, output_file)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Normalize .schem blocks using JSON rules.")
+    subparsers = parser.add_subparsers(dest="command")
+
+    normalize_parser = subparsers.add_parser("normalize", help="Apply normalization rules")
+    normalize_parser.add_argument("input", type=Path, help="Input .schem file or directory")
+    normalize_parser.add_argument("-o", "--output", type=Path, help="Output file or directory")
+    normalize_parser.add_argument("-c", "--config", type=Path, required=True, help="Rules JSON file")
+    normalize_parser.add_argument("--glob", default="*.schem", help="Glob pattern for batch mode")
+    normalize_parser.add_argument("--dry-run", action="store_true", help="Do not write output files")
+    normalize_parser.set_defaults(func=_normalize)
+
+    count_parser = subparsers.add_parser("count", help="Count blocks in schematics")
+    count_parser.add_argument("input", type=Path, help="Input .schem file or directory")
+    count_parser.add_argument("--glob", default="*.schem", help="Glob pattern for batch mode")
+    count_parser.add_argument("--by-state", action="store_true", help="Count by blockstate")
+    count_parser.add_argument(
+        "--per-file",
+        action="store_true",
+        help="Print per-file counts instead of aggregated totals",
+    )
+    count_parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable the single-line progress indicator",
+    )
+    count_parser.set_defaults(func=_count_blocks)
+
+    argv = sys.argv[1:]
+    if argv and argv[0] not in ("normalize", "count", "-h", "--help"):
+        argv = ["normalize"] + argv
+    args = parser.parse_args(argv)
+
+    if args.command is None:
+        if hasattr(args, "config"):
+            _normalize(args)
+        else:
+            parser.print_help()
+        return
+
+    if args.command == "count":
+        _count_blocks(
+            args.input,
+            args.glob,
+            args.by_state,
+            args.per_file,
+            not args.no_progress,
+        )
+    else:
+        args.func(args)
+
+
+def _print_progress(message: str) -> None:
+    padded = message.ljust(120)
+    sys.stdout.write(f"\r{padded}")
+    sys.stdout.flush()
 
 
 if __name__ == "__main__":

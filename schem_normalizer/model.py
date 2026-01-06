@@ -24,3 +24,6 @@ class Schematic:
     data_version: int | None = None
     version: int | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    container: str = "root"
+    blocks_container: str = "root"
+    block_data_key: str = "BlockData"
