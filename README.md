@@ -40,7 +40,7 @@ python -m schem_normalizer -c rules\example.json input.schem -o out_dir
 
 Batch directory:
 ```
-python -m schem_normalizer -c rules\example.json E:\input_dir -o E:\output_dir --glob "*.schem"
+python -m schem_normalizer -c rules\example.json path\to\input_dir -o path\to\output_dir --glob "*.schem"
 ```
 
 You can also use the explicit subcommand:
@@ -49,21 +49,21 @@ python -m schem_normalizer normalize -c rules\example.json input.schem -o out_di
 ```
 Short alias:
 ```
-python -m schem_normalizer n -c rules\example.json input.schem -o out_dir
+python -m schem_normalizer n -c rules\example.json input.schem -o path\to\output_dir
 ```
 
 ## Count blocks
 Aggregated totals:
 ```
-python -m schem_normalizer count E:\input_dir --glob "*.schem"
+python -m schem_normalizer count path\to\input_dir --glob "*.schem"
 ```
 Short alias:
 ```
-python -m schem_normalizer c E:\input_dir
+python -m schem_normalizer c path\to\input_dir
 ```
 Default glob (no --glob needed):
 ```
-python -m schem_normalizer count E:\input_dir
+python -m schem_normalizer count path\to\input_dir
 ```
 
 Per file:
@@ -84,21 +84,21 @@ python -m schem_normalizer count E:\input_dir --no-progress
 ## Sizes
 Print dimensions for each file:
 ```
-python -m schem_normalizer size E:\input_dir --glob "*.schem"
+python -m schem_normalizer size path\to\input_dir --glob "*.schem"
 ```
 Short alias:
 ```
-python -m schem_normalizer s E:\input_dir
+python -m schem_normalizer s path\to\input_dir
 ```
 
 Summary mode (max edge threshold, default 32):
 ```
-python -m schem_normalizer size E:\input_dir --glob "*.schem" --threshold 32 --summary
+python -m schem_normalizer size path\to\input_dir --glob "*.schem" --threshold 32 --summary
 ```
 
 Export matching files:
 ```
-python -m schem_normalizer size E:\input_dir --glob "*.schem" --threshold 32 --export E:\out_dir --select within
+python -m schem_normalizer size path\to\input_dir --glob "*.schem" --threshold 32 --export path\to\output_dir --select within
 ```
 
 ## Rules
