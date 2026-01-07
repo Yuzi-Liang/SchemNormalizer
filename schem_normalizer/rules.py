@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
-ALLOWED_TRANSFORMS = {"map_to_air", "normalize_variants"}
+ALLOWED_TRANSFORMS = {"map_to_air", "normalize_variants", "strip_states"}
 
 
 @dataclass
@@ -17,6 +17,8 @@ class BlockMatch:
 class NormalizeRule:
     match: BlockMatch
     to_id: str
+    preserve_states: bool = True
+    preserve_nbt: bool = True
 
 
 @dataclass
@@ -24,7 +26,11 @@ class RuleSet:
     pipeline: list[str]
     map_to_air_ids: set[str]
     normalize_rules: list[NormalizeRule]
-    normalize_map: dict[str, str]
+    normalize_map: dict[str, NormalizeRule]
+    default_preserve_states: bool = True
+    default_preserve_nbt: bool = True
+    strip_states_ids: set[str] = field(default_factory=set)
+    strip_nbt_ids: set[str] = field(default_factory=set)
 
 
 class RuleError(ValueError):
@@ -55,19 +61,48 @@ def _parse_rules(data: dict, source: Path) -> RuleSet:
 
     map_to_air_ids = _parse_id_list(data.get("map_to_air", {}).get("ids", []), "map_to_air.ids")
 
-    normalize_rules = _parse_normalize_rules(data.get("normalize_variants", []))
-    normalize_map: dict[str, str] = {}
+    defaults = data.get("normalize_defaults", {})
+    if defaults is None:
+        defaults = {}
+    if not isinstance(defaults, dict):
+        raise RuleError("'normalize_defaults' must be an object.")
+    default_preserve_states = defaults.get("preserve_states", True)
+    default_preserve_nbt = defaults.get("preserve_nbt", True)
+    if not isinstance(default_preserve_states, bool):
+        raise RuleError("normalize_defaults.preserve_states must be a boolean.")
+    if not isinstance(default_preserve_nbt, bool):
+        raise RuleError("normalize_defaults.preserve_nbt must be a boolean.")
+
+    normalize_rules = _parse_normalize_rules(
+        data.get("normalize_variants", []),
+        default_preserve_states,
+        default_preserve_nbt,
+    )
+    normalize_map: dict[str, NormalizeRule] = {}
     for rule in normalize_rules:
         for block_id in rule.match.ids:
-            if block_id in normalize_map and normalize_map[block_id] != rule.to_id:
-                raise RuleError(f"Conflicting normalize rules for '{block_id}'.")
-            normalize_map[block_id] = rule.to_id
+            if block_id in normalize_map:
+                existing = normalize_map[block_id]
+                if (
+                    existing.to_id != rule.to_id
+                    or existing.preserve_states != rule.preserve_states
+                    or existing.preserve_nbt != rule.preserve_nbt
+                ):
+                    raise RuleError(f"Conflicting normalize rules for '{block_id}'.")
+            normalize_map[block_id] = rule
+
+    strip_states_ids = _parse_id_list(data.get("strip_states", {}).get("ids", []), "strip_states.ids")
+    strip_nbt_ids = _parse_id_list(data.get("strip_nbt", {}).get("ids", []), "strip_nbt.ids")
 
     return RuleSet(
         pipeline=pipeline,
         map_to_air_ids=map_to_air_ids,
         normalize_rules=normalize_rules,
         normalize_map=normalize_map,
+        default_preserve_states=default_preserve_states,
+        default_preserve_nbt=default_preserve_nbt,
+        strip_states_ids=strip_states_ids,
+        strip_nbt_ids=strip_nbt_ids,
     )
 
 
@@ -82,7 +117,11 @@ def _parse_id_list(value: object, label: str) -> set[str]:
     return ids
 
 
-def _parse_normalize_rules(value: object) -> list[NormalizeRule]:
+def _parse_normalize_rules(
+    value: object,
+    default_preserve_states: bool,
+    default_preserve_nbt: bool,
+) -> list[NormalizeRule]:
     if not isinstance(value, list):
         raise RuleError("'normalize_variants' must be a list.")
 
@@ -102,6 +141,20 @@ def _parse_normalize_rules(value: object) -> list[NormalizeRule]:
         if not isinstance(to_id, str) or not to_id:
             raise RuleError("normalize_variants.to.id must be a non-empty string.")
 
-        rules.append(NormalizeRule(match=BlockMatch(ids=ids), to_id=to_id))
+        preserve_states = entry.get("preserve_states", default_preserve_states)
+        preserve_nbt = entry.get("preserve_nbt", default_preserve_nbt)
+        if not isinstance(preserve_states, bool):
+            raise RuleError("normalize_variants.preserve_states must be a boolean.")
+        if not isinstance(preserve_nbt, bool):
+            raise RuleError("normalize_variants.preserve_nbt must be a boolean.")
+
+        rules.append(
+            NormalizeRule(
+                match=BlockMatch(ids=ids),
+                to_id=to_id,
+                preserve_states=preserve_states,
+                preserve_nbt=preserve_nbt,
+            )
+        )
 
     return rules

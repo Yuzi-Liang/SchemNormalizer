@@ -23,3 +23,8 @@ htmlcov/
 
 *.schem
 *.schematic
+
+schem_normalizer.exe
+schem_normalizer
+schem_normalizer/schem_normalizer.exe
+schem_normalizer/schem_normalizer

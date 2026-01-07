@@ -17,6 +17,20 @@ Supports WorldEdit `.schem` variants and preserves block states and NBT.
 pip install -r requirements.txt
 ```
 
+## Go wrapper (optional)
+Build a small executable that calls the Python module:
+```
+go build -o schem_normalizer.exe .\cmd\schem_normalizer
+```
+
+Run it like:
+```
+.\schem_normalizer.exe -c rules\example.json input.schem -o out_dir
+```
+
+You can override which Python is used with `SCHEM_NORMALIZER_PYTHON`.
+This wrapper uses Cobra for CLI help and argument handling.
+
 ## Normalize (apply rules)
 Single file:
 ```
@@ -56,3 +70,13 @@ python -m schem_normalizer count E:\input_dir --no-progress
 
 ## Rules
 Rules are defined in JSON. See `rules/example.json` for a complete template.
+
+Rule options you can use:
+- `normalize_defaults.preserve_states`: default state preservation for normalize rules.
+- `normalize_defaults.preserve_nbt`: default NBT preservation for normalize rules.
+- `strip_states.ids`: clear block states for specific ids after normalization.
+- `strip_nbt.ids`: clear block entity NBT for specific ids after normalization.
+
+Notes:
+- Mapping to air always drops states and NBT.
+- `strip_states` runs after `normalize_variants` when listed in `pipeline`.
