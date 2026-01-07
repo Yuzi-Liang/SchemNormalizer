@@ -20,16 +20,17 @@ pip install -r requirements.txt
 ## Go wrapper (optional)
 Build a small executable that calls the Python module:
 ```
-go build -o schem_normalizer.exe .\cmd\schem_normalizer
+go build -o schem_normalizer .\cmd\schem_normalizer
 ```
 
 Run it like:
 ```
-.\schem_normalizer.exe -c rules\example.json input.schem -o out_dir
+.\schem_normalizer -c rules\example.json input.schem -o out_dir
 ```
 
 You can override which Python is used with `SCHEM_NORMALIZER_PYTHON`.
 This wrapper uses Cobra for CLI help and argument handling.
+If `-c/--config` is omitted, it will use `rules/example.json` when present.
 
 ## Normalize (apply rules)
 Single file:
@@ -45,6 +46,12 @@ python -m schem_normalizer -c rules\example.json E:\input_dir -o E:\output_dir -
 You can also use the explicit subcommand:
 ```
 python -m schem_normalizer normalize -c rules\example.json input.schem -o out_dir
+```
+Short aliases:
+```
+python -m schem_normalizer n -c rules\example.json input.schem -o out_dir
+python -m schem_normalizer c E:\input_dir --glob "*.schem"
+python -m schem_normalizer s E:\input_dir --glob "*.schem"
 ```
 
 ## Count blocks
@@ -72,11 +79,6 @@ python -m schem_normalizer count E:\input_dir --no-progress
 Print dimensions for each file:
 ```
 python -m schem_normalizer size E:\input_dir --glob "*.schem"
-```
-
-Using the Go wrapper:
-```
-.\schem_normalizer size E:\Study\stage_4 --glob "*.schem"
 ```
 
 Summary mode (max edge threshold, default 32):
