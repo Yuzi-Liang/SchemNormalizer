@@ -10,6 +10,8 @@ from .blockstate import format_block_state
 from .pipeline import apply_pipeline
 from .rules import RuleError, load_rules
 
+_PROGRESS_ENABLED = True
+
 
 def _resolve_output_path(input_path: Path, output: Path | None) -> Path:
     if output is None:
@@ -69,7 +71,32 @@ def _count_blocks(
     if not per_file:
         for key in sorted(totals):
             print(f"{key}:{totals[key]}")
-    if show_progress:
+    if show_progress and _PROGRESS_ENABLED:
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+
+
+def _print_sizes(input_path: Path, pattern: str, show_progress: bool) -> None:
+    files = _iter_input_files(input_path, pattern)
+    if not files:
+        raise SystemExit("No .schem files matched the input.")
+
+    total_files = len(files)
+    for index, input_file in enumerate(files, start=1):
+        try:
+            schematic = read_schematic(input_file)
+        except Exception as exc:
+            if show_progress:
+                _print_progress(f"[{index}/{total_files}] {input_file} | error")
+            print(f"skip {input_file}: {exc}", file=sys.stderr)
+            continue
+
+        width, height, length = schematic.size
+        if show_progress:
+            _print_progress(f"[{index}/{total_files}] {input_file} | done")
+        print(f"{input_file}: {width}x{height}x{length}")
+
+    if show_progress and _PROGRESS_ENABLED:
         sys.stdout.write("\n")
         sys.stdout.flush()
 
@@ -144,8 +171,18 @@ def main() -> None:
     )
     count_parser.set_defaults(func=_count_blocks)
 
+    size_parser = subparsers.add_parser("size", help="Print schematic dimensions")
+    size_parser.add_argument("input", type=Path, help="Input .schem file or directory")
+    size_parser.add_argument("--glob", default="*.schem", help="Glob pattern for batch mode")
+    size_parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable the single-line progress indicator",
+    )
+    size_parser.set_defaults(func=_print_sizes)
+
     argv = sys.argv[1:]
-    if argv and argv[0] not in ("normalize", "count", "-h", "--help"):
+    if argv and argv[0] not in ("normalize", "count", "size", "-h", "--help"):
         argv = ["normalize"] + argv
     args = parser.parse_args(argv)
 
@@ -164,14 +201,22 @@ def main() -> None:
             args.per_file,
             not args.no_progress,
         )
+    elif args.command == "size":
+        _print_sizes(args.input, args.glob, not args.no_progress)
     else:
         args.func(args)
 
 
 def _print_progress(message: str) -> None:
+    global _PROGRESS_ENABLED
+    if not _PROGRESS_ENABLED:
+        return
     padded = message.ljust(120)
-    sys.stdout.write(f"\r{padded}")
-    sys.stdout.flush()
+    try:
+        sys.stdout.write(f"\r{padded}")
+        sys.stdout.flush()
+    except OSError:
+        _PROGRESS_ENABLED = False
 
 
 if __name__ == "__main__":
