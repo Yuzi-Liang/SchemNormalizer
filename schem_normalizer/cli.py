@@ -172,7 +172,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Normalize .schem blocks using JSON rules.")
     subparsers = parser.add_subparsers(dest="command")
 
-    normalize_parser = subparsers.add_parser("normalize", help="Apply normalization rules")
+    normalize_parser = subparsers.add_parser(
+        "normalize",
+        aliases=["n"],
+        help="Apply normalization rules",
+    )
     normalize_parser.add_argument("input", type=Path, help="Input .schem file or directory")
     normalize_parser.add_argument("-o", "--output", type=Path, help="Output file or directory")
     normalize_parser.add_argument("-c", "--config", type=Path, required=True, help="Rules JSON file")
@@ -180,7 +184,11 @@ def main() -> None:
     normalize_parser.add_argument("--dry-run", action="store_true", help="Do not write output files")
     normalize_parser.set_defaults(func=_normalize)
 
-    count_parser = subparsers.add_parser("count", help="Count blocks in schematics")
+    count_parser = subparsers.add_parser(
+        "count",
+        aliases=["c"],
+        help="Count blocks in schematics",
+    )
     count_parser.add_argument("input", type=Path, help="Input .schem file or directory")
     count_parser.add_argument("--glob", default="*.schem", help="Glob pattern for batch mode")
     count_parser.add_argument("--by-state", action="store_true", help="Count by blockstate")
@@ -196,7 +204,11 @@ def main() -> None:
     )
     count_parser.set_defaults(func=_count_blocks)
 
-    size_parser = subparsers.add_parser("size", help="Print schematic dimensions")
+    size_parser = subparsers.add_parser(
+        "size",
+        aliases=["s"],
+        help="Print schematic dimensions",
+    )
     size_parser.add_argument("input", type=Path, help="Input .schem file or directory")
     size_parser.add_argument("--glob", default="*.schem", help="Glob pattern for batch mode")
     size_parser.add_argument(
@@ -228,8 +240,9 @@ def main() -> None:
     )
     size_parser.set_defaults(func=_print_sizes)
 
+
     argv = sys.argv[1:]
-    if argv and argv[0] not in ("normalize", "count", "size", "-h", "--help"):
+    if argv and argv[0] not in ("normalize", "count", "size", "n", "c", "s", "-h", "--help"):
         argv = ["normalize"] + argv
     args = parser.parse_args(argv)
 
@@ -240,7 +253,7 @@ def main() -> None:
             parser.print_help()
         return
 
-    if args.command == "count":
+    if args.command in ("count", "c"):
         _count_blocks(
             args.input,
             args.glob,
@@ -248,7 +261,7 @@ def main() -> None:
             args.per_file,
             not args.no_progress,
         )
-    elif args.command == "size":
+    elif args.command in ("size", "s"):
         _print_sizes(
             args.input,
             args.glob,
@@ -258,6 +271,8 @@ def main() -> None:
             args.export,
             args.select,
         )
+    elif args.command in ("normalize", "n"):
+        _normalize(args)
     else:
         args.func(args)
 
