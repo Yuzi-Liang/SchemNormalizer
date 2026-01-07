@@ -12,12 +12,14 @@ from .model import Block, BlockPlacement, Schematic
 def read_schematic(path: Path) -> Schematic:
     root = nbtlib.load(str(path))
 
+    # Support both root and nested Schematic layouts.
     container = root
     container_kind = "root"
     if isinstance(root.get("Schematic"), Compound):
         container = root["Schematic"]
         container_kind = "schematic"
 
+    # Some schem variants nest palette/data under a Blocks compound.
     blocks_container = container
     blocks_container_kind = "root"
     if isinstance(container.get("Blocks"), Compound):
@@ -38,6 +40,7 @@ def read_schematic(path: Path) -> Schematic:
     for name, value in palette.items():
         palette_by_id[int(value)] = str(name)
 
+    # Block data tag name varies across schem variants; accept both.
     raw_block_data = blocks_container.get("BlockData")
     block_data_key = "BlockData"
     if raw_block_data is None:
@@ -187,6 +190,7 @@ def _to_signed_bytes(data: bytes) -> list[int]:
 
 
 def _read_block_entities(root: Compound) -> dict[tuple[int, int, int], Compound]:
+    # Preserve only entities with valid coordinates.
     entities = root.get("BlockEntities") or root.get("TileEntities") or []
     mapping: dict[tuple[int, int, int], Compound] = {}
     for entity in entities:

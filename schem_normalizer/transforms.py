@@ -30,6 +30,7 @@ def normalize_variants(block: Block, ruleset: RuleSet) -> tuple[Block, bool]:
 
 
 def strip_states(block: Block, ruleset: RuleSet) -> tuple[Block, bool]:
+    # Clear states/NBT for specific ids after normalization.
     changed = False
     states = dict(block.states)
     nbt = block.nbt
