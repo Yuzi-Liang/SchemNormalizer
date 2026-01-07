@@ -36,7 +36,7 @@ func findPython() string {
 
 func runPython(args []string) error {
 	python := findPython()
-	argv := append([]string{"-m", "schem_normalizer"}, args...)
+	argv := append([]string{"-m", "schem_normalizer"}, withDefaultConfig(args)...)
 
 	cmd := exec.Command(python, argv...)
 	cmd.Stdout = os.Stdout
@@ -87,4 +87,46 @@ func containsHelp(args []string) bool {
 		}
 	}
 	return false
+}
+
+func withDefaultConfig(args []string) []string {
+	if len(args) == 0 {
+		return args
+	}
+
+	if hasConfigFlag(args) {
+		return args
+	}
+
+	if isSizeOrCount(args) {
+		return args
+	}
+
+	rulesPath := filepath.Join("rules", "example.json")
+	if _, err := os.Stat(rulesPath); err == nil {
+		if args[0] == "normalize" || args[0] == "n" {
+			return append([]string{args[0], "-c", rulesPath}, args[1:]...)
+		}
+		// No explicit subcommand; treat as normalize.
+		return append([]string{"normalize", "-c", rulesPath}, args...)
+	}
+
+	return args
+}
+
+func hasConfigFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "-c" || arg == "--config" {
+			return true
+		}
+	}
+	return false
+}
+
+func isSizeOrCount(args []string) bool {
+	if len(args) == 0 {
+		return false
+	}
+	cmd := args[0]
+	return cmd == "count" || cmd == "c" || cmd == "size" || cmd == "s"
 }
