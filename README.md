@@ -47,17 +47,23 @@ You can also use the explicit subcommand:
 ```
 python -m schem_normalizer normalize -c rules\example.json input.schem -o out_dir
 ```
-Short aliases:
+Short alias:
 ```
 python -m schem_normalizer n -c rules\example.json input.schem -o out_dir
-python -m schem_normalizer c E:\input_dir --glob "*.schem"
-python -m schem_normalizer s E:\input_dir --glob "*.schem"
 ```
 
 ## Count blocks
 Aggregated totals:
 ```
 python -m schem_normalizer count E:\input_dir --glob "*.schem"
+```
+Short alias:
+```
+python -m schem_normalizer c E:\input_dir
+```
+Default glob (no --glob needed):
+```
+python -m schem_normalizer count E:\input_dir
 ```
 
 Per file:
@@ -79,6 +85,10 @@ python -m schem_normalizer count E:\input_dir --no-progress
 Print dimensions for each file:
 ```
 python -m schem_normalizer size E:\input_dir --glob "*.schem"
+```
+Short alias:
+```
+python -m schem_normalizer s E:\input_dir
 ```
 
 Summary mode (max edge threshold, default 32):
