@@ -76,12 +76,20 @@ def _count_blocks(
         sys.stdout.flush()
 
 
-def _print_sizes(input_path: Path, pattern: str, show_progress: bool) -> None:
+def _print_sizes(
+    input_path: Path,
+    pattern: str,
+    show_progress: bool,
+    threshold: int,
+    summary_only: bool,
+) -> None:
     files = _iter_input_files(input_path, pattern)
     if not files:
         raise SystemExit("No .schem files matched the input.")
 
     total_files = len(files)
+    over = 0
+    within = 0
     for index, input_file in enumerate(files, start=1):
         try:
             schematic = read_schematic(input_file)
@@ -94,11 +102,19 @@ def _print_sizes(input_path: Path, pattern: str, show_progress: bool) -> None:
         width, height, length = schematic.size
         if show_progress:
             _print_progress(f"[{index}/{total_files}] {input_file} | done")
-        print(f"{input_file}: {width}x{height}x{length}")
+        max_edge = max(width, height, length)
+        if max_edge > threshold:
+            over += 1
+        else:
+            within += 1
+        if not summary_only:
+            print(f"{input_file}: {width}x{height}x{length}")
 
     if show_progress and _PROGRESS_ENABLED:
         sys.stdout.write("\n")
         sys.stdout.flush()
+    print(f"over_{threshold}: {over}")
+    print(f"within_{threshold}: {within}")
 
 
 def _normalize(args: argparse.Namespace) -> None:
@@ -175,6 +191,17 @@ def main() -> None:
     size_parser.add_argument("input", type=Path, help="Input .schem file or directory")
     size_parser.add_argument("--glob", default="*.schem", help="Glob pattern for batch mode")
     size_parser.add_argument(
+        "--threshold",
+        type=int,
+        default=32,
+        help="Max edge length threshold for summary counts",
+    )
+    size_parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Only print summary counts",
+    )
+    size_parser.add_argument(
         "--no-progress",
         action="store_true",
         help="Disable the single-line progress indicator",
@@ -202,7 +229,13 @@ def main() -> None:
             not args.no_progress,
         )
     elif args.command == "size":
-        _print_sizes(args.input, args.glob, not args.no_progress)
+        _print_sizes(
+            args.input,
+            args.glob,
+            not args.no_progress,
+            args.threshold,
+            args.summary,
+        )
     else:
         args.func(args)
 

@@ -68,6 +68,22 @@ Disable progress:
 python -m schem_normalizer count E:\input_dir --no-progress
 ```
 
+## Sizes
+Print dimensions for each file:
+```
+python -m schem_normalizer size E:\input_dir --glob "*.schem"
+```
+
+Using the Go wrapper:
+```
+.\schem_normalizer size E:\Study\stage_4 --glob "*.schem"
+```
+
+Summary mode (max edge threshold, default 32):
+```
+python -m schem_normalizer size E:\input_dir --glob "*.schem" --threshold 32 --summary
+```
+
 ## Rules
 Rules are defined in JSON. See `rules/example.json` for a complete template.
 
