@@ -4,6 +4,7 @@ import argparse
 from collections import Counter
 from pathlib import Path
 import sys
+import shutil
 
 from .adapter import read_schematic, write_schematic
 from .blockstate import format_block_state
@@ -82,6 +83,8 @@ def _print_sizes(
     show_progress: bool,
     threshold: int,
     summary_only: bool,
+    export_dir: Path | None,
+    export_select: str,
 ) -> None:
     files = _iter_input_files(input_path, pattern)
     if not files:
@@ -90,6 +93,8 @@ def _print_sizes(
     total_files = len(files)
     over = 0
     within = 0
+    if export_dir is not None:
+        export_dir.mkdir(parents=True, exist_ok=True)
     for index, input_file in enumerate(files, start=1):
         try:
             schematic = read_schematic(input_file)
@@ -103,10 +108,14 @@ def _print_sizes(
         if show_progress:
             _print_progress(f"[{index}/{total_files}] {input_file} | done")
         max_edge = max(width, height, length)
-        if max_edge > threshold:
+        is_over = max_edge > threshold
+        if is_over:
             over += 1
         else:
             within += 1
+        if export_dir is not None:
+            if (export_select == "over" and is_over) or (export_select == "within" and not is_over):
+                shutil.copy2(input_file, export_dir / input_file.name)
         if not summary_only:
             print(f"{input_file}: {width}x{height}x{length}")
 
@@ -202,6 +211,17 @@ def main() -> None:
         help="Only print summary counts",
     )
     size_parser.add_argument(
+        "--export",
+        type=Path,
+        help="Copy matching schematics to this directory",
+    )
+    size_parser.add_argument(
+        "--select",
+        choices=["within", "over"],
+        default="within",
+        help="Which size class to export (default: within)",
+    )
+    size_parser.add_argument(
         "--no-progress",
         action="store_true",
         help="Disable the single-line progress indicator",
@@ -235,6 +255,8 @@ def main() -> None:
             not args.no_progress,
             args.threshold,
             args.summary,
+            args.export,
+            args.select,
         )
     else:
         args.func(args)

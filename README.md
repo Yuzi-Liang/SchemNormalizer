@@ -84,6 +84,11 @@ Summary mode (max edge threshold, default 32):
 python -m schem_normalizer size E:\input_dir --glob "*.schem" --threshold 32 --summary
 ```
 
+Export matching files:
+```
+python -m schem_normalizer size E:\input_dir --glob "*.schem" --threshold 32 --export E:\out_dir --select within
+```
+
 ## Rules
 Rules are defined in JSON. See `rules/example.json` for a complete template.
 
